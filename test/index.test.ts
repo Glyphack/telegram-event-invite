@@ -189,11 +189,25 @@ describe("event keyboard", () => {
     expect(kb[0]).toHaveLength(2);
     expect(kb[0][0].text).toBe("I'm in");
     expect(kb[0][0].callback_data).toBeDefined();
-    expect(kb[0][1].text).toBe("Not my ownership");
+    expect(kb[0][1].text).toBe("I'm out");
     expect(kb[1][0].text).toBe("Save to Google Calendar");
     expect(kb[1][0].url).toContain("calendar.google.com");
     expect(kb[1][1].text).toBe("Set your email");
     expect(kb[1][1].url).toBe("https://t.me/tinyinvitebot?start=set_email");
+  });
+});
+
+describe("joined notice", () => {
+  it("names the attendee and the event", () => {
+    const event = new CalendarEvent("Dinner", "20250101T000000Z", "20250101T020000Z");
+    expect(event.joinedNotice("Alice")).toBe('Alice has joined your event "Dinner". Send it out if you\'re done.');
+  });
+
+  it("builds a calendar button with the attendee emails", () => {
+    const event = new CalendarEvent("Dinner", "20250101T000000Z", "20250101T020000Z");
+    const button = event.calendarButton(["a@b.com"]);
+    expect(button.text).toBe("Save to Google Calendar");
+    expect(button.url).toContain("add=a%40b.com");
   });
 });
 

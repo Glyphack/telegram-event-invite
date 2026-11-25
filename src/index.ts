@@ -5,6 +5,7 @@ import {
   type TelegramCallbackQuery,
   type TelegramChosenInlineResult,
   type TelegramUpdate,
+  type TelegramUser,
   type InlineQueryResultArticle,
   type InlineKeyboardButton,
 } from "./telegram";
@@ -122,17 +123,25 @@ export class CalendarEvent {
     return `📅 ${this.title}\n${this.dateRange()}\n\nAttendees: ${attendeeLine}`;
   }
 
+  calendarButton(emails: string[]): InlineKeyboardButton {
+    return { text: "Save to Google Calendar", url: this.googleCalendarUrl(emails) };
+  }
+
   keyboard(organizerId: number, emails: string[] = []): InlineKeyboardButton[][] {
     return [
       [
         { text: "I'm in", callback_data: this.callbackData("y", organizerId) },
-        { text: "Not my ownership", callback_data: this.callbackData("n", organizerId) },
+        { text: "I'm out", callback_data: this.callbackData("n", organizerId) },
       ],
       [
-        { text: "Save to Google Calendar", url: this.googleCalendarUrl(emails) },
+        this.calendarButton(emails),
         { text: "Set your email", url: `https://t.me/${BOT_USERNAME}?start=set_email` },
       ],
     ];
+  }
+
+  joinedNotice(attendeeName: string): string {
+    return `${attendeeName} has joined your event "${this.title}". Send it out if you're done.`;
   }
 }
 
@@ -321,6 +330,21 @@ async function refreshEventMessage(
   await telegram.editMessageText(inlineMessageId, event.message(names), { inline_keyboard: event.keyboard(organizerId, emails) });
 }
 
+async function notifyOrganizer(
+  telegram: TelegramClient,
+  store: Store,
+  inlineMessageId: string,
+  event: CalendarEvent,
+  organizerId: number,
+  attendee: TelegramUser,
+): Promise<void> {
+  if (attendee.id === organizerId) return;
+  const emails = await store.getRsvpEmails(inlineMessageId);
+  await telegram.sendMessage(organizerId, event.joinedNotice(attendee.first_name), {
+    inline_keyboard: [[event.calendarButton(emails)]],
+  });
+}
+
 // --- Bot logic ---
 
 const EMAIL_PROMPT = "Reply to this message with your email address (e.g. you@example.com).";
@@ -464,6 +488,7 @@ async function handleCallbackQuery(callbackQuery: TelegramCallbackQuery, telegra
     }
     await store.addRsvp(inlineMessageId, from.id);
     await refreshEventMessage(telegram, store, inlineMessageId, event, organizerId);
+    await notifyOrganizer(telegram, store, inlineMessageId, event, organizerId, from);
     await telegram.answerCallbackQuery(queryId, "You're in!");
     return;
   }
