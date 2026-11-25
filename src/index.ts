@@ -205,9 +205,9 @@ export class Store {
 
 // --- AI parsing ---
 
-const EVENT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
+const EVENT_MODEL = "@cf/google/gemma-4-26b-a4b-it";
 
-type RunTextModel = (model: string, inputs: AiTextGenerationInput) => Promise<AiTextGenerationOutput>;
+type RunChatModel = (model: string, inputs: ChatCompletionsMessagesInput) => Promise<ChatCompletionsOutput>;
 
 interface ParsedEvent {
   title: string;
@@ -249,17 +249,18 @@ export function parseModelEvent(raw: unknown): ParsedEvent {
 }
 
 async function extractEvent(ai: Ai, query: string, reference: Date): Promise<ParsedEvent> {
-  const input: AiTextGenerationInput = {
+  const input: ChatCompletionsMessagesInput = {
     messages: [
       { role: "system", content: buildSystemPrompt(reference) },
       { role: "user", content: query },
     ],
     temperature: 0,
+    chat_template_kwargs: { enable_thinking: false },
   };
 
   const run = async (): Promise<ParsedEvent> => {
-    const response = await (ai.run as unknown as RunTextModel)(EVENT_MODEL, input);
-    return parseModelEvent(response.response);
+    const response = await (ai.run as unknown as RunChatModel)(EVENT_MODEL, input);
+    return parseModelEvent(response.choices[0]?.message.content);
   };
 
   try {
